@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Recruiter {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  jobs      Job[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id           String        @id @default(cuid())
+  recruiterId  String
+  recruiter    Recruiter     @relation(fields: [recruiterId], references: [id])
+  title        String
+  description  String
+  linkId       String        @unique @default(uuid())
+  isActive     Boolean       @default(true)
+  questions    Question[]
+  applications Application[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([recruiterId])
+  @@index([linkId])
+}
+
+model Question {
+  id             String          @id @default(cuid())
+  jobId          String
+  job            Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  questionText   String
+  timeLimit      Int             @default(20)
+  orderIndex     Int
+  videoResponses VideoResponse[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([jobId])
+  @@index([jobId, orderIndex])
+}
+
+model Candidate {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  applications Application[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Application {
+  id             String          @id @default(cuid())
+  candidateId    String
+  candidate      Candidate       @relation(fields: [candidateId], references: [id])
+  jobId          String
+  job            Job             @relation(fields: [jobId], references: [id])
+  startedAt      DateTime        @default(now())
+  completedAt    DateTime?
+  videoResponses VideoResponse[]
+
+  @@unique([candidateId, jobId])
+  @@index([jobId])
+  @@index([candidateId])
+}
+
+model VideoResponse {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question    @relation(fields: [questionId], references: [id])
+  filePath      String
+  duration      Int
+  fileSize      Int?
+  mimeType      String      @default("video/webm")
+  recordedAt    DateTime    @default(now())
+
+  @@unique([applicationId, questionId])
+  @@index([applicationId])
+  @@index([questionId])
+}
