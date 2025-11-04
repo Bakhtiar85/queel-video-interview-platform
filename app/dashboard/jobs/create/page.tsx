@@ -39,9 +39,13 @@ export default function CreateJobPage() {
         setQuestions(questions.filter((_, i) => i !== index))
     }
 
-    const updateQuestion = (index: number, field: keyof Question, value: string | number) => {
+    const updateQuestion = (index: number, field: keyof Question, value: string) => {
         const updated = [...questions]
-        updated[index] = { ...updated[index], [field]: value }
+        if (field === 'timeLimit') {
+            updated[index] = { ...updated[index], timeLimit: Number(value) || 20 }
+        } else {
+            updated[index] = { ...updated[index], questionText: value }
+        }
         setQuestions(updated)
     }
 
@@ -84,7 +88,7 @@ export default function CreateJobPage() {
     if (!isAuthenticated || !recruiter) return null
 
     return (
-        <div className="min-h-screen p-8">
+        <div className="min-h-screen p-8 bg-background">
             <div className="mx-auto max-w-3xl">
                 <Card>
                     <CardHeader>
@@ -144,7 +148,7 @@ export default function CreateJobPage() {
                                                         min={10}
                                                         max={300}
                                                         value={q.timeLimit}
-                                                        onChange={(e) => updateQuestion(idx, 'timeLimit', parseInt(e.target.value))}
+                                                        onChange={(e) => updateQuestion(idx, 'timeLimit', e.target.value)}
                                                     />
                                                 </div>
                                                 {questions.length > 1 && (
