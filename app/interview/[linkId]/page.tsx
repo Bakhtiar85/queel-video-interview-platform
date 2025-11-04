@@ -84,18 +84,42 @@ export default function InterviewPage() {
         setUploading(true)
 
         try {
-            // TODO: Implement video upload API
-            console.log('Candidate:', candidateName, candidateEmail)
-            console.log('Job:', job?.title)
-            console.log('Videos to upload:', videos.length)
+            if (!job) return
 
-            // Simulate upload
-            await new Promise(resolve => setTimeout(resolve, 2000))
+            // Upload all videos
+            for (let i = 0; i < videos.length; i++) {
+                const formData = new FormData()
+                formData.append('video', videos[i], `question-${i}.webm`)
+                formData.append('jobId', job.id)
+                formData.append('candidateName', candidateName)
+                formData.append('candidateEmail', candidateEmail)
+                formData.append('questionId', job.questions[i].id)
+                formData.append('duration', job.questions[i].timeLimit.toString())
+
+                const res = await fetch('/api/candidate/submit', {
+                    method: 'POST',
+                    body: formData
+                })
+
+                const data: ApiResponse = await res.json()
+                if (!data.status) {
+                    throw new Error(`Failed to upload video ${i + 1}`)
+                }
+            }
+
+            // Mark as complete
+            await fetch('/api/candidate/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    candidateEmail,
+                    jobId: job.id
+                })
+            })
 
             setStep('complete')
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Failed to submit videos')
-        } finally {
             setUploading(false)
         }
     }
