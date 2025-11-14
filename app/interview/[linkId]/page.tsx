@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ApiResponse } from '@/types'
-import VideoRecorder from '@/components/ui/candidate/VideoRecorder'
+import CameraSetup from '@/components/ui/candidate/CameraSetup'
+import QuestionRecorder from '@/components/ui/candidate/QuestionRecorder'
 
 interface Job {
     id: string
@@ -29,7 +30,7 @@ export default function InterviewPage() {
     const params = useParams()
     const linkId = params.linkId as string
 
-    const [step, setStep] = useState<'intro' | 'interview' | 'complete'>('intro')
+    const [step, setStep] = useState<'intro' | 'setup' | 'interview' | 'complete'>('intro')
     const [job, setJob] = useState<Job | null>(null)
     const [candidateName, setCandidateName] = useState('')
     const [candidateEmail, setCandidateEmail] = useState('')
@@ -66,6 +67,10 @@ export default function InterviewPage() {
             return
         }
         setError('')
+        setStep('setup')
+    }
+
+    const handleSetupComplete = () => {
         setStep('interview')
     }
 
@@ -86,7 +91,6 @@ export default function InterviewPage() {
         try {
             if (!job) return
 
-            // Upload all videos
             for (let i = 0; i < videos.length; i++) {
                 const formData = new FormData()
                 formData.append('video', videos[i], `question-${i}.webm`)
@@ -107,7 +111,6 @@ export default function InterviewPage() {
                 }
             }
 
-            // Mark as complete
             await fetch('/api/candidate/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -126,7 +129,7 @@ export default function InterviewPage() {
 
     if (loading) {
         return (
-            <div className="flex min-h-screen items-center justify-center">
+            <div className="flex min-h-screen items-center justify-center bg-background">
                 <p>Loading interview...</p>
             </div>
         )
@@ -134,7 +137,7 @@ export default function InterviewPage() {
 
     if (error && !job) {
         return (
-            <div className="flex min-h-screen items-center justify-center">
+            <div className="flex min-h-screen items-center justify-center bg-background">
                 <p className="text-red-600">{error}</p>
             </div>
         )
@@ -144,14 +147,14 @@ export default function InterviewPage() {
 
     if (step === 'intro') {
         return (
-            <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="flex min-h-screen items-center justify-center p-4 bg-background">
                 <Card className="w-full max-w-2xl">
                     <CardHeader>
                         <CardTitle>{job.title}</CardTitle>
                         <CardDescription>{job.description}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                             This interview has {job.questions.length} question(s). You&apos;ll record a video response for each.
                         </p>
                         <div className="space-y-2">
@@ -185,36 +188,37 @@ export default function InterviewPage() {
         )
     }
 
+    if (step === 'setup') {
+        return <CameraSetup onComplete={handleSetupComplete} />
+    }
+
     if (step === 'interview') {
         const currentQuestion = job.questions[currentQuestionIndex]
 
         return (
-            <div className="flex min-h-screen items-center justify-center p-4">
-                <div className="w-full max-w-3xl space-y-4">
-                    <p className="text-center text-gray-600">
-                        Question {currentQuestionIndex + 1} of {job.questions.length}
-                    </p>
-                    <VideoRecorder
-                        key={currentQuestionIndex}
-                        questionText={currentQuestion.questionText}
-                        timeLimit={currentQuestion.timeLimit}
-                        onRecordingComplete={handleRecordingComplete}
-                    />
-                </div>
+            <div className="flex min-h-screen items-center justify-center p-4 bg-background">
+                <QuestionRecorder
+                    key={currentQuestionIndex}
+                    questionText={currentQuestion.questionText}
+                    timeLimit={currentQuestion.timeLimit}
+                    questionNumber={currentQuestionIndex + 1}
+                    totalQuestions={job.questions.length}
+                    onNext={handleRecordingComplete}
+                />
             </div>
         )
     }
 
     if (step === 'complete') {
         return (
-            <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="flex min-h-screen items-center justify-center p-4 bg-background">
                 <Card className="w-full max-w-2xl">
                     <CardHeader>
                         <CardTitle>Interview Complete!</CardTitle>
                         <CardDescription>Thank you for completing the interview</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                             Your responses have been submitted successfully. The recruiter will review them and get back to you.
                         </p>
                     </CardContent>

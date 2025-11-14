@@ -1,0 +1,26 @@
+1. this interview system will be separate module
+2. but the users registered with queel can use their cred on this interview system. 
+3. QUE: USER WHO GET REGISTERED ON THIS INTERVIEW SYSTEM, WILL THEY AUTOMATICALLY GET REGISTERED WITH QUEEL?  and VICE - VIRSA
+4. THIS SYSTEM WILL BE PART OF QUEEL AND CAN BE ACCESSED SEPARTELY. 
+5. USER [CANDIDATE / RECRUITER] REGISTER
+5.1. RECRUITER -> CREATE QUESTIONS/SETUP INTERVIEW
+--------------------------------------------
+
+1. Permission Message for mic and camera 
+2. Allow demo for mic and camera also add skip button
+3. to make it more comfortable we will give a button to start the video recording
+4. then there would be a demo text like [ Say: Hello, this is demo test and I am ready for the interview ]
+5. 3 retakes for every questions [ SHOULD ONLY ON CANDIDATE SIDE on THEIR BROWSER ] until HE/SHE finally submits the interview.
+6. allow user to view/replay their recordings [ RECORDING WILL BE NUMBERED WITH THE QUESTIONS ]
+7. on next button user will be moved to next question [ AND SAME 5 AND 6 STEPS WILL BE REPATED FOR EACH QUESTION ]
+8. after recordings of final question user will have the option to submit the interview.
+9. for every question there should be one best chosen (BY CANDIDATE HIM/HER SELF) video to be saved on server.
+10. after interview submits, user will be engaged/or requested to stay on the final submission page, so that the videos get safely uploaded to the server.
+11. once videos get uploaded we allow user to safely close the page.
+12. each video should be maximum of 20 - 30 sec in length, and we will restrict recruiter in this case. 
+13. and there would be in total time set by recruiter for the complete interview.
+14. recruiter will be allowed to run demo test for each question
+14.i-> to set time limit for each question 
+14.ii-> to make the continuity in the questions 
+14.iii-> recruiter can check his demo videos just like candidate can do
+14.iv-> but these answers will not get saved in real on server
