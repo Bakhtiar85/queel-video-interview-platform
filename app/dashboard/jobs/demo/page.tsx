@@ -14,23 +14,24 @@ interface Question {
     timeLimit: number
 }
 
+const DEFAULT_QUESTIONS: Question[] = [
+    { questionText: 'Tell us about yourself', timeLimit: 20 },
+    { questionText: 'What are your strengths?', timeLimit: 20 }
+]
+
+// Helper function to get initial questions
+function getInitialQuestions(): Question[] {
+    if (typeof window === 'undefined') return DEFAULT_QUESTIONS
+
+    const saved = sessionStorage.getItem('demoQuestions')
+    return saved ? JSON.parse(saved) : DEFAULT_QUESTIONS
+}
+
 export default function DemoModePage() {
     const router = useRouter()
     const [step, setStep] = useState<'intro' | 'setup' | 'recording' | 'complete'>('intro')
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-
-    const [demoQuestions, setDemoQuestions] = useState<Question[]>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = sessionStorage.getItem('demoQuestions')
-            if (saved) {
-                return JSON.parse(saved)
-            }
-        }
-        return [
-            { questionText: 'Tell us about yourself', timeLimit: 20 },
-            { questionText: 'What are your strengths?', timeLimit: 20 }
-        ]
-    })
+    const [demoQuestions] = useState<Question[]>(getInitialQuestions)
 
     const handleSetupComplete = () => {
         setStep('recording')
