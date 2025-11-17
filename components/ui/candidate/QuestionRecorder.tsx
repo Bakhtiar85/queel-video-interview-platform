@@ -14,6 +14,8 @@ interface QuestionRecorderProps {
     onNext: (selectedVideo: Blob) => void
 }
 
+const MOCK_MODE = process.env.DEBUG_MODE === "true" || false; // Set to false for production
+
 export default function QuestionRecorder({
     questionText,
     timeLimit,
@@ -44,6 +46,27 @@ export default function QuestionRecorder({
     }, [])
 
     const startCamera = async () => {
+        if (MOCK_MODE) {
+            // Mock mode - create dummy stream
+            const canvas = document.createElement('canvas')
+            canvas.width = 640
+            canvas.height = 480
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+                ctx.fillStyle = '#000'
+                ctx.fillRect(0, 0, 640, 480)
+                ctx.fillStyle = '#fff'
+                ctx.font = '30px Arial'
+                ctx.fillText('MOCK CAMERA', 200, 240)
+            }
+            const mockStream = canvas.captureStream(30)
+            setStream(mockStream)
+            if (videoRef.current) {
+                videoRef.current.srcObject = mockStream
+            }
+            return
+        }
+
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: true,

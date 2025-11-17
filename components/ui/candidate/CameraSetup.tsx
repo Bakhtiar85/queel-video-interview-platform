@@ -10,6 +10,8 @@ interface CameraSetupProps {
     onComplete: () => void
 }
 
+const MOCK_MODE = process.env.NEXT_PUBLIC_DEBUG_MODE === "true" || false;
+
 export default function CameraSetup({ onComplete }: CameraSetupProps) {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [stream, setStream] = useState<MediaStream | null>(null)
@@ -24,6 +26,29 @@ export default function CameraSetup({ onComplete }: CameraSetupProps) {
     const timerRef = useRef<NodeJS.Timeout | null>(null)
 
     const requestPermission = async () => {
+        if (MOCK_MODE) {
+            // Mock mode - create dummy stream
+            const canvas = document.createElement('canvas')
+            canvas.width = 640
+            canvas.height = 480
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+                ctx.fillStyle = '#000'
+                ctx.fillRect(0, 0, 640, 480)
+                ctx.fillStyle = '#fff'
+                ctx.font = '30px Arial'
+                ctx.fillText('MOCK CAMERA', 200, 240)
+            }
+            const mockStream = canvas.captureStream(30)
+            setStream(mockStream)
+            if (videoRef.current) {
+                videoRef.current.srcObject = mockStream
+            }
+            setPermissionGranted(true)
+            setError('')
+            return
+        }
+
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: true,

@@ -15,6 +15,7 @@ interface Job {
     description: string
     linkId: string
     createdAt: string
+    questions: Array<{ questionText: string; timeLimit: number }>
     _count: { applications: number }
 }
 
@@ -94,23 +95,38 @@ export default function DashboardPage() {
                                     <CardDescription>{job.description.substring(0, 100)}...</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
-                                    <p className="text-sm text-gray-600">
+                                    <p className="text-sm text-muted-foreground">
                                         {job._count.applications} application(s)
                                     </p>
-                                    <div className="flex gap-2">
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => copyLink(job.linkId)}
+                                                className="flex-1"
+                                            >
+                                                Copy Link
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => router.push(`/dashboard/jobs/${job.id}/submissions`)}
+                                                className="flex-1"
+                                            >
+                                                View Submissions
+                                            </Button>
+                                        </div>
                                         <Button
                                             size="sm"
-                                            variant="outline"
-                                            onClick={() => copyLink(job.linkId)}
+                                            variant="secondary"
+                                            onClick={() => {
+                                                sessionStorage.setItem('demoQuestions', JSON.stringify(job.questions))
+                                                router.push('/dashboard/jobs/demo')
+                                            }}
+                                            className="w-full"
                                         >
-                                            Copy Link
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => router.push(`/dashboard/jobs/${job.id}/submissions`)}
-                                        >
-                                            View Submissions
+                                            Test Interview
                                         </Button>
                                     </div>
                                 </CardContent>

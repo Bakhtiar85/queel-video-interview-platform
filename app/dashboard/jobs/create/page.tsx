@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ApiResponse } from '@/types'
 
 interface Question {
@@ -42,11 +42,18 @@ export default function CreateJobPage() {
     const updateQuestion = (index: number, field: keyof Question, value: string) => {
         const updated = [...questions]
         if (field === 'timeLimit') {
-            updated[index] = { ...updated[index], timeLimit: Number(value) || 20 }
+            const numValue = Number(value)
+            // Clamp between 10 and 30
+            const clampedValue = Math.max(10, Math.min(30, numValue || 20))
+            updated[index] = { ...updated[index], timeLimit: clampedValue }
         } else {
             updated[index] = { ...updated[index], questionText: value }
         }
         setQuestions(updated)
+    }
+
+    const calculateTotalTime = () => {
+        return questions.reduce((total, q) => total + q.timeLimit, 0)
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -56,6 +63,15 @@ export default function CreateJobPage() {
 
         if (!recruiter) {
             setError('User session expired')
+            setLoading(false)
+            return
+        }
+
+        // Validate time limits
+        const invalidQuestion = questions.find(q => q.timeLimit < 10 || q.timeLimit > 30)
+        if (invalidQuestion) {
+            setError('Each question must have a time limit between 10 and 30 seconds')
+            setLoading(false)
             return
         }
 
@@ -87,12 +103,19 @@ export default function CreateJobPage() {
 
     if (!isAuthenticated || !recruiter) return null
 
+    const totalTime = calculateTotalTime()
+    const totalMinutes = Math.floor(totalTime / 60)
+    const totalSeconds = totalTime % 60
+
     return (
         <div className="min-h-screen p-8 bg-background">
             <div className="mx-auto max-w-3xl">
                 <Card>
                     <CardHeader>
                         <CardTitle>Create New Job</CardTitle>
+                        <CardDescription>
+                            Set up interview questions with time limits (10-30 seconds each)
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-6">
@@ -141,15 +164,18 @@ export default function CreateJobPage() {
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <div className="flex-1 space-y-2">
-                                                    <Label>Time Limit (seconds)</Label>
+                                                    <Label>Time Limit (10-30 seconds)</Label>
                                                     <Input
                                                         type="number"
                                                         required
                                                         min={10}
-                                                        max={300}
+                                                        max={30}
                                                         value={q.timeLimit}
                                                         onChange={(e) => updateQuestion(idx, 'timeLimit', e.target.value)}
                                                     />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Current: {q.timeLimit} seconds
+                                                    </p>
                                                 </div>
                                                 {questions.length > 1 && (
                                                     <Button
@@ -165,6 +191,39 @@ export default function CreateJobPage() {
                                         </CardContent>
                                     </Card>
                                 ))}
+                            </div>
+
+                            {/* Demo Mode Toggle */}
+                            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium">Test Your Questions</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Try recording answers to see how candidates will experience the interview
+                                        </p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            sessionStorage.setItem('demoQuestions', JSON.stringify(questions))
+                                            router.push('/dashboard/jobs/demo')
+                                        }}
+                                        disabled={questions.length === 0 || questions.some(q => !q.questionText.trim())}
+                                    >
+                                        Demo Mode
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Total Time Display */}
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <p className="text-sm font-medium">
+                                    Total Interview Time: {totalMinutes}m {totalSeconds}s
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {questions.length} question(s)
+                                </p>
                             </div>
 
                             {error && <p className="text-sm text-red-600">{error}</p>}

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ApiResponse } from '@/types'
 import CameraSetup from '@/components/ui/candidate/CameraSetup'
 import QuestionRecorder from '@/components/ui/candidate/QuestionRecorder'
+import UploadProgress from '@/components/ui/candidate/UploadProgress'
 
 interface Job {
     id: string
@@ -30,14 +31,14 @@ export default function InterviewPage() {
     const params = useParams()
     const linkId = params.linkId as string
 
-    const [step, setStep] = useState<'intro' | 'setup' | 'interview' | 'complete'>('intro')
+    const [step, setStep] = useState<'intro' | 'setup' | 'interview' | 'uploading' | 'complete'>('intro')
     const [job, setJob] = useState<Job | null>(null)
     const [candidateName, setCandidateName] = useState('')
     const [candidateEmail, setCandidateEmail] = useState('')
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
     const [recordedVideos, setRecordedVideos] = useState<Blob[]>([])
     const [loading, setLoading] = useState(true)
-    const [uploading, setUploading] = useState(false)
+    const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
     const [error, setError] = useState('')
 
     useEffect(() => {
@@ -86,12 +87,15 @@ export default function InterviewPage() {
     }
 
     const submitAllVideos = async (videos: Blob[]) => {
-        setUploading(true)
+        if (!job) return
+
+        setStep('uploading')
+        setUploadProgress({ current: 0, total: videos.length })
 
         try {
-            if (!job) return
-
             for (let i = 0; i < videos.length; i++) {
+                setUploadProgress({ current: i + 1, total: videos.length })
+
                 const formData = new FormData()
                 formData.append('video', videos[i], `question-${i}.webm`)
                 formData.append('jobId', job.id)
@@ -123,7 +127,7 @@ export default function InterviewPage() {
             setStep('complete')
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Failed to submit videos')
-            setUploading(false)
+            setStep('interview')
         }
     }
 
@@ -209,21 +213,13 @@ export default function InterviewPage() {
         )
     }
 
-    if (step === 'complete') {
+    if (step === 'uploading' || step === 'complete') {
         return (
-            <div className="flex min-h-screen items-center justify-center p-4 bg-background">
-                <Card className="w-full max-w-2xl">
-                    <CardHeader>
-                        <CardTitle>Interview Complete!</CardTitle>
-                        <CardDescription>Thank you for completing the interview</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground">
-                            Your responses have been submitted successfully. The recruiter will review them and get back to you.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+            <UploadProgress
+                current={uploadProgress.current}
+                total={uploadProgress.total}
+                isComplete={step === 'complete'}
+            />
         )
     }
 
