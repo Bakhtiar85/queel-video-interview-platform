@@ -24,3 +24,22 @@
 14.ii-> to make the continuity in the questions 
 14.iii-> recruiter can check his demo videos just like candidate can do
 14.iv-> but these answers will not get saved in real on server
+
+-----------------------------------------------
+Que time limit, 20, 40 or max 1min (60 sec) drop down
+The recruiter will add the emails of the candidates who can attempt on the job (to allow the specific candidates)
+Record vertical [portrait-mode] / mobile type video 
+1. most of the people will record from mobiles
+2. this will help also in reduce file/video size as well
+3. need to reduce the video file size [WE WILL SEE HOW TO HANDLE THE VIDEO SIZE ON THE BACKEND ON FRONTEND]
+4. fast API (python)
+
+On the left side of the interview portal for the candidate
+show small palet style thing/card
+- where candidate will see which questions are completed
+- how many videos per question are attempted
+- and which video is selected (in green tick)
+
+
+:::BUG:::
+SOME TIME IT IS TOTALLY BLACK ON THE CAMERA.

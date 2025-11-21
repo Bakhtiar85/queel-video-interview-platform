@@ -2,8 +2,7 @@
 
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import CameraSetup from '@/components/ui/candidate/CameraSetup'
@@ -19,19 +18,36 @@ const DEFAULT_QUESTIONS: Question[] = [
     { questionText: 'What are your strengths?', timeLimit: 20 }
 ]
 
-// Helper function to get initial questions
-function getInitialQuestions(): Question[] {
-    if (typeof window === 'undefined') return DEFAULT_QUESTIONS
-
-    const saved = sessionStorage.getItem('demoQuestions')
-    return saved ? JSON.parse(saved) : DEFAULT_QUESTIONS
-}
-
 export default function DemoModePage() {
-    const router = useRouter()
     const [step, setStep] = useState<'intro' | 'setup' | 'recording' | 'complete'>('intro')
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-    const [demoQuestions] = useState<Question[]>(getInitialQuestions)
+    const [demoQuestions, setDemoQuestions] = useState<Question[]>(DEFAULT_QUESTIONS)
+    const [isLoading, setIsLoading] = useState(true)
+
+    // Load questions with a slight delay to avoid hydration issues
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            try {
+                // Try localStorage first (for new tab support)
+                const savedLocal = localStorage.getItem('demoQuestions')
+                if (savedLocal) {
+                    setDemoQuestions(JSON.parse(savedLocal))
+                } else {
+                    // Fallback to sessionStorage
+                    const saved = sessionStorage.getItem('demoQuestions')
+                    if (saved) {
+                        setDemoQuestions(JSON.parse(saved))
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load demo questions:', error)
+                // Keep DEFAULT_QUESTIONS
+            }
+            setIsLoading(false)
+        }, 100) // Small delay to avoid hydration mismatch
+
+        return () => clearTimeout(timer)
+    }, [])
 
     const handleSetupComplete = () => {
         setStep('recording')
@@ -50,6 +66,22 @@ export default function DemoModePage() {
         setStep('setup')
     }
 
+    // Show loading state
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center p-4 bg-background">
+                <Card className="w-full max-w-2xl">
+                    <CardContent className="py-12">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                            <p className="text-center text-muted-foreground">Loading demo questions...</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        )
+    }
+
     if (step === 'intro') {
         return (
             <div className="flex min-h-screen items-center justify-center p-4 bg-background">
@@ -57,7 +89,7 @@ export default function DemoModePage() {
                     <CardHeader>
                         <CardTitle>Demo Mode</CardTitle>
                         <CardDescription>
-                            Test the interview experience with sample questions
+                            Test the interview experience with your questions
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -76,8 +108,8 @@ export default function DemoModePage() {
                             <Button onClick={() => setStep('setup')} className="flex-1">
                                 Start Demo
                             </Button>
-                            <Button variant="outline" onClick={() => router.back()} className="flex-1">
-                                Back
+                            <Button variant="outline" onClick={() => window.close()} className="flex-1">
+                                Close
                             </Button>
                         </div>
                     </CardContent>
@@ -128,8 +160,8 @@ export default function DemoModePage() {
                             <Button onClick={restartDemo} variant="outline" className="flex-1">
                                 Try Again
                             </Button>
-                            <Button onClick={() => router.push('/dashboard/jobs/create')} className="flex-1">
-                                Back to Job Creation
+                            <Button onClick={() => window.close()} className="flex-1">
+                                Close Tab
                             </Button>
                         </div>
                     </CardContent>

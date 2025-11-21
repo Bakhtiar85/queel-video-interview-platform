@@ -16,6 +16,8 @@ interface Question {
     timeLimit: number
 }
 
+const TIME_LIMIT_OPTIONS = [20, 40, 60] as const
+
 export default function CreateJobPage() {
     const router = useRouter()
     const { recruiter, isAuthenticated } = useAuthStore()
@@ -39,15 +41,12 @@ export default function CreateJobPage() {
         setQuestions(questions.filter((_, i) => i !== index))
     }
 
-    const updateQuestion = (index: number, field: keyof Question, value: string) => {
+    const updateQuestion = (index: number, field: keyof Question, value: string | number) => {
         const updated = [...questions]
         if (field === 'timeLimit') {
-            const numValue = Number(value)
-            // Clamp between 10 and 30
-            const clampedValue = Math.max(10, Math.min(30, numValue || 20))
-            updated[index] = { ...updated[index], timeLimit: clampedValue }
+            updated[index] = { ...updated[index], timeLimit: Number(value) }
         } else {
-            updated[index] = { ...updated[index], questionText: value }
+            updated[index] = { ...updated[index], questionText: String(value) }
         }
         setQuestions(updated)
     }
@@ -68,9 +67,9 @@ export default function CreateJobPage() {
         }
 
         // Validate time limits
-        const invalidQuestion = questions.find(q => q.timeLimit < 10 || q.timeLimit > 30)
+        const invalidQuestion = questions.find(q => !TIME_LIMIT_OPTIONS.includes(q.timeLimit as typeof TIME_LIMIT_OPTIONS[number]))
         if (invalidQuestion) {
-            setError('Each question must have a time limit between 10 and 30 seconds')
+            setError('Each question must have a valid time limit (20, 40, or 60 seconds)')
             setLoading(false)
             return
         }
@@ -107,6 +106,8 @@ export default function CreateJobPage() {
     const totalMinutes = Math.floor(totalTime / 60)
     const totalSeconds = totalTime % 60
 
+    const isDemoDisabled = questions.length === 0 || questions.some(q => !q.questionText.trim())
+
     return (
         <div className="min-h-screen p-8 bg-background">
             <div className="mx-auto max-w-3xl">
@@ -114,7 +115,7 @@ export default function CreateJobPage() {
                     <CardHeader>
                         <CardTitle>Create New Job</CardTitle>
                         <CardDescription>
-                            Set up interview questions with time limits (10-30 seconds each)
+                            Set up interview questions with time limits (20, 40, or 60 seconds)
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -164,15 +165,19 @@ export default function CreateJobPage() {
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <div className="flex-1 space-y-2">
-                                                    <Label>Time Limit (10-30 seconds)</Label>
-                                                    <Input
-                                                        type="number"
+                                                    <Label>Time Limit</Label>
+                                                    <select
                                                         required
-                                                        min={10}
-                                                        max={30}
                                                         value={q.timeLimit}
                                                         onChange={(e) => updateQuestion(idx, 'timeLimit', e.target.value)}
-                                                    />
+                                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                    >
+                                                        {TIME_LIMIT_OPTIONS.map((time) => (
+                                                            <option key={time} value={time}>
+                                                                {time} seconds
+                                                            </option>
+                                                        ))}
+                                                    </select>
                                                     <p className="text-xs text-muted-foreground">
                                                         Current: {q.timeLimit} seconds
                                                     </p>
@@ -206,10 +211,16 @@ export default function CreateJobPage() {
                                         type="button"
                                         variant="outline"
                                         onClick={() => {
-                                            sessionStorage.setItem('demoQuestions', JSON.stringify(questions))
-                                            router.push('/dashboard/jobs/demo')
+                                            if (isDemoDisabled) {
+                                                setError('Please add at least one question with text before testing')
+                                                return
+                                            }
+                                            // Save to localStorage (persists across tabs)
+                                            localStorage.setItem('demoQuestions', JSON.stringify(questions))
+                                            // Open in new tab
+                                            window.open('/dashboard/jobs/demo', '_blank', 'noopener,noreferrer')
                                         }}
-                                        disabled={questions.length === 0 || questions.some(q => !q.questionText.trim())}
+                                        disabled={isDemoDisabled}
                                     >
                                         Demo Mode
                                     </Button>

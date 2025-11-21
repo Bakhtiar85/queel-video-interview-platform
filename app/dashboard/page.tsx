@@ -122,7 +122,7 @@ export default function DashboardPage() {
                                             variant="secondary"
                                             onClick={() => {
                                                 sessionStorage.setItem('demoQuestions', JSON.stringify(job.questions))
-                                                router.push('/dashboard/jobs/demo')
+                                                window.open('/dashboard/jobs/demo', '_blank', 'noopener,noreferrer')
                                             }}
                                             className="w-full"
                                         >
