@@ -17,7 +17,7 @@ export default function VideoPlayer({ src, className = '' }: VideoPlayerProps) {
             <video
                 ref={videoRef}
                 controls
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain" style={{ maxWidth: '480px', aspectRatio: '3/4' }}
                 preload="metadata"
             >
                 <source src={src} type="video/webm" />

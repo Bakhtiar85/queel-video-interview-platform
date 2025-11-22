@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { ApiResponse } from '@/types'
 import CameraSetup from '@/components/ui/candidate/CameraSetup'
 import QuestionRecorder from '@/components/ui/candidate/QuestionRecorder'
 import UploadProgress from '@/components/ui/candidate/UploadProgress'
+import InterviewProgress from '@/components/ui/candidate/InterviewProgress'
 
 interface Job {
     id: string
@@ -25,6 +26,15 @@ interface Question {
     questionText: string
     timeLimit: number
     orderIndex: number
+}
+
+interface QuestionProgressData {
+    questionNumber: number
+    questionText: string
+    attemptsUsed: number
+    maxAttempts: number
+    isCompleted: boolean
+    hasSelectedVideo: boolean
 }
 
 export default function InterviewPage() {
@@ -41,9 +51,27 @@ export default function InterviewPage() {
     const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
     const [error, setError] = useState('')
 
+    // Track progress for each question
+    const [questionProgress, setQuestionProgress] = useState<QuestionProgressData[]>([])
+
     useEffect(() => {
         fetchJob()
     }, [])
+
+    // Initialize progress tracking when job loads
+    useEffect(() => {
+        if (job) {
+            const initialProgress: QuestionProgressData[] = job.questions.map((q, idx) => ({
+                questionNumber: idx + 1,
+                questionText: q.questionText,
+                attemptsUsed: 0,
+                maxAttempts: 3,
+                isCompleted: false,
+                hasSelectedVideo: false
+            }))
+            setQuestionProgress(initialProgress)
+        }
+    }, [job])
 
     const fetchJob = async () => {
         try {
@@ -56,7 +84,7 @@ export default function InterviewPage() {
                 setError('Job not found or link expired')
             }
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Failed to load job')
+            setError(err instanceof Error ? err.message : 'Failed to load interview')
         } finally {
             setLoading(false)
         }
@@ -64,10 +92,9 @@ export default function InterviewPage() {
 
     const handleStart = () => {
         if (!candidateName.trim() || !candidateEmail.trim()) {
-            setError('Please enter your name and email')
+            setError('Please fill in all fields')
             return
         }
-        setError('')
         setStep('setup')
     }
 
@@ -75,53 +102,71 @@ export default function InterviewPage() {
         setStep('interview')
     }
 
-    const handleRecordingComplete = (blob: Blob) => {
-        const newVideos = [...recordedVideos, blob]
-        setRecordedVideos(newVideos)
+    const handleProgressUpdate = useCallback((attemptsUsed: number, hasSelected: boolean) => {
+        setQuestionProgress(prev => {
+            const updated = [...prev]
+            updated[currentQuestionIndex] = {
+                ...updated[currentQuestionIndex],
+                attemptsUsed,
+                hasSelectedVideo: hasSelected
+            }
+            return updated
+        })
+    }, [currentQuestionIndex])
 
-        if (job && currentQuestionIndex < job.questions.length - 1) {
-            setCurrentQuestionIndex(currentQuestionIndex + 1)
-        } else {
-            submitAllVideos(newVideos)
+    const handleNavigateToQuestion = (index: number) => {
+        // Only allow navigation to completed or current question
+        if (index <= currentQuestionIndex) {
+            setCurrentQuestionIndex(index)
         }
     }
 
-    const submitAllVideos = async (videos: Blob[]) => {
-        if (!job) return
+    const handleRecordingComplete = (videoBlob: Blob, attemptsUsed: number) => {
+        // Mark current question as completed
+        setQuestionProgress(prev => {
+            const updated = [...prev]
+            updated[currentQuestionIndex] = {
+                ...updated[currentQuestionIndex],
+                isCompleted: true,
+                attemptsUsed
+            }
+            return updated
+        })
 
+        setRecordedVideos([...recordedVideos, videoBlob])
+
+        if (currentQuestionIndex < job!.questions.length - 1) {
+            setCurrentQuestionIndex(currentQuestionIndex + 1)
+        } else {
+            uploadVideos([...recordedVideos, videoBlob])
+        }
+    }
+
+    const uploadVideos = async (videos: Blob[]) => {
         setStep('uploading')
         setUploadProgress({ current: 0, total: videos.length })
 
         try {
             for (let i = 0; i < videos.length; i++) {
-                setUploadProgress({ current: i + 1, total: videos.length })
-
                 const formData = new FormData()
-                formData.append('video', videos[i], `question-${i}.webm`)
-                formData.append('jobId', job.id)
+                formData.append('video', videos[i])
+                formData.append('questionId', job!.questions[i].id)
                 formData.append('candidateName', candidateName)
                 formData.append('candidateEmail', candidateEmail)
-                formData.append('questionId', job.questions[i].id)
-                formData.append('duration', job.questions[i].timeLimit.toString())
+                formData.append('linkId', linkId)
 
-                const res = await fetch('/api/candidate/submit', {
+                await fetch('/api/candidate/submit', {
                     method: 'POST',
                     body: formData
                 })
 
-                const data: ApiResponse = await res.json()
-                if (!data.status) {
-                    throw new Error(`Failed to upload video ${i + 1}`)
-                }
+                setUploadProgress({ current: i + 1, total: videos.length })
             }
 
             await fetch('/api/candidate/complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    candidateEmail,
-                    jobId: job.id
-                })
+                body: JSON.stringify({ linkId, candidateEmail })
             })
 
             setStep('complete')
@@ -200,15 +245,32 @@ export default function InterviewPage() {
         const currentQuestion = job.questions[currentQuestionIndex]
 
         return (
-            <div className="flex min-h-screen items-center justify-center p-4 bg-background">
-                <QuestionRecorder
-                    key={currentQuestionIndex}
-                    questionText={currentQuestion.questionText}
-                    timeLimit={currentQuestion.timeLimit}
-                    questionNumber={currentQuestionIndex + 1}
-                    totalQuestions={job.questions.length}
-                    onNext={handleRecordingComplete}
-                />
+            <div className="min-h-screen p-4 bg-background">
+                <div className="mx-auto max-w-7xl">
+                    <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
+                        {/* Progress Sidebar - Hidden on mobile, visible on desktop */}
+                        <div className="hidden lg:block">
+                            <InterviewProgress
+                                questions={questionProgress}
+                                currentQuestionIndex={currentQuestionIndex}
+                                onNavigate={handleNavigateToQuestion}
+                            />
+                        </div>
+
+                        {/* Main Interview Area */}
+                        <div className="flex-1 flex items-center justify-center">
+                            <QuestionRecorder
+                                key={currentQuestionIndex}
+                                questionText={currentQuestion.questionText}
+                                timeLimit={currentQuestion.timeLimit}
+                                questionNumber={currentQuestionIndex + 1}
+                                totalQuestions={job.questions.length}
+                                onNext={handleRecordingComplete}
+                                onProgressUpdate={handleProgressUpdate}
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
         )
     }

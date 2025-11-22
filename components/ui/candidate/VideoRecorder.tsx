@@ -127,7 +127,7 @@ export default function VideoRecorder({ questionText, timeLimit, onRecordingComp
             <CardContent className="space-y-4">
                 {error && <p className="text-red-600">{error}</p>}
 
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden" style={{ maxWidth: '480px', aspectRatio: '3/4' }}>
                     <video
                         ref={videoRef}
                         autoPlay

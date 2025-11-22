@@ -5,12 +5,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Smartphone } from 'lucide-react'
 
 interface CameraSetupProps {
     onComplete: () => void
 }
 
 const MOCK_MODE = process.env.NEXT_PUBLIC_DEBUG_MODE === "true" || false;
+
+// Detect if user is on mobile device
+const isMobileDevice = () => {
+    if (typeof window === 'undefined') return false
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768
+}
 
 export default function CameraSetup({ onComplete }: CameraSetupProps) {
     const videoRef = useRef<HTMLVideoElement>(null)
@@ -21,6 +28,7 @@ export default function CameraSetup({ onComplete }: CameraSetupProps) {
     const [demoCountdown, setDemoCountdown] = useState<number | null>(null)
     const [demoRecordedUrl, setDemoRecordedUrl] = useState<string | null>(null)
     const [demoTimeLeft, setDemoTimeLeft] = useState(30)
+    const [isMobile] = useState(isMobileDevice)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const chunksRef = useRef<Blob[]>([])
     const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -29,15 +37,15 @@ export default function CameraSetup({ onComplete }: CameraSetupProps) {
         if (MOCK_MODE) {
             // Mock mode - create dummy stream
             const canvas = document.createElement('canvas')
-            canvas.width = 640
-            canvas.height = 480
+            canvas.width = 480  // Portrait dimensions
+            canvas.height = 640
             const ctx = canvas.getContext('2d')
             if (ctx) {
                 ctx.fillStyle = '#000'
-                ctx.fillRect(0, 0, 640, 480)
+                ctx.fillRect(0, 0, 480, 640)
                 ctx.fillStyle = '#fff'
-                ctx.font = '30px Arial'
-                ctx.fillText('MOCK CAMERA', 200, 240)
+                ctx.font = '24px Arial'
+                ctx.fillText('MOCK CAMERA', 150, 320)
             }
             const mockStream = canvas.captureStream(30)
             setStream(mockStream)
@@ -50,8 +58,14 @@ export default function CameraSetup({ onComplete }: CameraSetupProps) {
         }
 
         try {
+            // Request portrait/mobile format video
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
+                video: {
+                    width: { ideal: 480 },
+                    height: { ideal: 640 },
+                    aspectRatio: { ideal: 0.75 }, // 3:4 portrait ratio
+                    facingMode: 'user'
+                },
                 audio: true
             })
             setStream(mediaStream)
@@ -189,6 +203,28 @@ export default function CameraSetup({ onComplete }: CameraSetupProps) {
                                 We need access to your camera and microphone to record your interview responses.
                                 Click the button below to grant permissions.
                             </p>
+
+                            {/* Desktop user notice about portrait format */}
+                            {!isMobile && (
+                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg">
+                                    <div className="flex items-start gap-3">
+                                        <Smartphone className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                                        <div className="space-y-2">
+                                            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                                                📱 Portrait Mode Recording
+                                            </p>
+                                            <p className="text-sm text-blue-800 dark:text-blue-200">
+                                                Your video will be recorded in <strong>mobile/portrait format</strong> (vertical orientation).
+                                                This ensures consistency across all candidates and provides the best viewing experience for recruiters.
+                                            </p>
+                                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                                                Don&apos;t worry - you don&apos;t need to rotate your screen. We&apos;ll automatically format your video correctly!
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <Button onClick={requestPermission} size="lg" className="w-full">
                                 Allow Camera & Microphone
                             </Button>
@@ -205,11 +241,13 @@ export default function CameraSetup({ onComplete }: CameraSetupProps) {
                                 </div>
                             )}
 
-                            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                            {/* Portrait aspect ratio video container */}
+                            <div className="relative mx-auto bg-black rounded-lg overflow-hidden" style={{ maxWidth: '480px', aspectRatio: '3/4' }}>
                                 <video
                                     ref={videoRef}
                                     autoPlay
-                                    muted={!demoRecordedUrl} // Only unmute when playing back recording
+                                    style={{ transform: demoRecordedUrl ? 'none' : 'scaleX(-1)' }}
+                                    muted={!demoRecordedUrl}
                                     playsInline
                                     className="w-full h-full object-cover"
                                 />

@@ -2,26 +2,35 @@
 
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Check, Trash2, Eye, Video } from 'lucide-react'
+
+const MAX_ATTEMPTS = 3
+
+interface Recording {
+    blob: Blob
+    url: string
+    timestamp: Date
+}
 
 interface QuestionRecorderProps {
     questionText: string
     timeLimit: number
     questionNumber: number
     totalQuestions: number
-    onNext: (selectedVideo: Blob) => void
+    onNext: (selectedBlob: Blob, attemptsUsed: number) => void
+    onProgressUpdate?: (attemptsUsed: number, hasSelected: boolean) => void
 }
-
-const MOCK_MODE = process.env.DEBUG_MODE === "true" || false; // Set to false for production
 
 export default function QuestionRecorder({
     questionText,
     timeLimit,
     questionNumber,
     totalQuestions,
-    onNext
+    onNext,
+    onProgressUpdate
 }: QuestionRecorderProps) {
     const videoRef = useRef<HTMLVideoElement>(null)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -29,12 +38,12 @@ export default function QuestionRecorder({
     const timerRef = useRef<NodeJS.Timeout | null>(null)
 
     const [stream, setStream] = useState<MediaStream | null>(null)
-    const [recordings, setRecordings] = useState<Blob[]>([])
-    const [selectedRecording, setSelectedRecording] = useState<number | null>(null)
+    const [recordings, setRecordings] = useState<Recording[]>([])
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+    const [viewingRecording, setViewingRecording] = useState<number | null>(null)
     const [isRecording, setIsRecording] = useState(false)
     const [countdown, setCountdown] = useState<number | null>(null)
     const [timeLeft, setTimeLeft] = useState(timeLimit)
-    const [viewingRecording, setViewingRecording] = useState<number | null>(null)
     const [error, setError] = useState('')
 
     useEffect(() => {
@@ -45,31 +54,22 @@ export default function QuestionRecorder({
         }
     }, [])
 
-    const startCamera = async () => {
-        if (MOCK_MODE) {
-            // Mock mode - create dummy stream
-            const canvas = document.createElement('canvas')
-            canvas.width = 640
-            canvas.height = 480
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-                ctx.fillStyle = '#000'
-                ctx.fillRect(0, 0, 640, 480)
-                ctx.fillStyle = '#fff'
-                ctx.font = '30px Arial'
-                ctx.fillText('MOCK CAMERA', 200, 240)
-            }
-            const mockStream = canvas.captureStream(30)
-            setStream(mockStream)
-            if (videoRef.current) {
-                videoRef.current.srcObject = mockStream
-            }
-            return
+    // Notify parent about progress changes
+    useEffect(() => {
+        if (onProgressUpdate) {
+            onProgressUpdate(recordings.length, selectedIndex !== null)
         }
+    }, [recordings.length, selectedIndex, onProgressUpdate])
 
+    const startCamera = async () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
+                video: {
+                    width: { ideal: 480 },
+                    height: { ideal: 640 },
+                    aspectRatio: { ideal: 0.75 },
+                    facingMode: 'user'
+                },
                 audio: true
             })
             setStream(mediaStream)
@@ -117,9 +117,9 @@ export default function QuestionRecorder({
 
         mediaRecorder.onstop = () => {
             const blob = new Blob(chunksRef.current, { type: 'video/webm' })
-            setRecordings([...recordings, blob])
+            const url = URL.createObjectURL(blob)
+            setRecordings(prev => [...prev, { blob, url, timestamp: new Date() }])
 
-            // Reset video to live stream
             if (videoRef.current && stream) {
                 videoRef.current.srcObject = stream
                 videoRef.current.src = ''
@@ -155,7 +155,7 @@ export default function QuestionRecorder({
     }
 
     const playRecording = (index: number) => {
-        const url = URL.createObjectURL(recordings[index])
+        const url = URL.createObjectURL(recordings[index].blob)
         if (videoRef.current) {
             videoRef.current.srcObject = null
             videoRef.current.src = url
@@ -174,15 +174,45 @@ export default function QuestionRecorder({
         setViewingRecording(null)
     }
 
+    const handleSelectRecording = (index: number) => {
+        setSelectedIndex(index)
+        // Immediately notify parent about the selection change
+        if (onProgressUpdate) {
+            onProgressUpdate(recordings.length, true)
+        }
+    }
+
+    const handleDeleteRecording = (index: number) => {
+        URL.revokeObjectURL(recordings[index].url)
+        const newRecordings = recordings.filter((_, i) => i !== index)
+        setRecordings(newRecordings)
+
+        // Handle selected index adjustment
+        if (selectedIndex === index) {
+            setSelectedIndex(null)
+            // Notify parent that no video is selected now
+            if (onProgressUpdate) {
+                onProgressUpdate(newRecordings.length, false)
+            }
+        } else if (selectedIndex !== null && selectedIndex > index) {
+            // Adjust selectedIndex if we deleted a recording before it
+            setSelectedIndex(selectedIndex - 1)
+        }
+
+        if (viewingRecording === index) {
+            backToLive()
+        }
+    }
+
     const handleNext = () => {
-        if (selectedRecording === null) {
+        if (selectedIndex === null) {
             setError('Please select a recording to continue')
             return
         }
-        onNext(recordings[selectedRecording])
+        onNext(recordings[selectedIndex].blob, recordings.length)
     }
 
-    const canRecord = recordings.length < 3
+    const canRecord = recordings.length < MAX_ATTEMPTS
     const hasRecordings = recordings.length > 0
 
     return (
@@ -191,26 +221,24 @@ export default function QuestionRecorder({
                 <div className="flex items-center justify-between">
                     <CardTitle>Question {questionNumber} of {totalQuestions}</CardTitle>
                     <span className="text-sm text-muted-foreground">
-                        {recordings.length}/3 takes
+                        {recordings.length}/{MAX_ATTEMPTS} takes
                     </span>
                 </div>
-                <CardDescription>{questionText}</CardDescription>
+                <p className="text-muted-foreground mt-2">{questionText}</p>
                 <p className="text-sm text-muted-foreground">Time Limit: {timeLimit} seconds</p>
             </CardHeader>
-            <CardContent className="space-y-6">
-                {error && (
-                    <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg">
-                        {error}
-                    </div>
-                )}
+            <CardContent className="space-y-4">
+                {error && <p className="text-sm text-red-600">{error}</p>}
 
-                <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                {/* Video Preview */}
+                <div className="relative mx-auto bg-black rounded-lg overflow-hidden" style={{ maxWidth: '480px', aspectRatio: '3/4' }}>
                     <video
                         ref={videoRef}
                         autoPlay
-                        muted={!viewingRecording && viewingRecording !== 0}
+                        muted={viewingRecording === null}
                         playsInline
                         className="w-full h-full object-cover"
+                        style={{ transform: viewingRecording === null ? 'scaleX(-1)' : 'none' }}
                     />
 
                     {countdown !== null && (
@@ -228,26 +256,14 @@ export default function QuestionRecorder({
                 </div>
 
                 {/* Recording Controls */}
-                {!isRecording && countdown === null && viewingRecording === null && (
-                    <div className="flex gap-3">
-                        <Button
-                            onClick={startCountdown}
-                            disabled={!canRecord}
-                            className="flex-1"
-                            size="lg"
-                        >
-                            {recordings.length === 0 ? 'Start Recording' : `Record Take ${recordings.length + 1}`}
-                        </Button>
-                        {!canRecord && (
-                            <p className="text-sm text-muted-foreground self-center">
-                                Maximum 3 takes reached
-                            </p>
-                        )}
-                    </div>
+                {!isRecording && countdown === null && viewingRecording === null && canRecord && (
+                    <Button onClick={startCountdown} size="lg" className="w-full">
+                        {hasRecordings ? `Record Attempt ${recordings.length + 1}` : 'Start Recording'}
+                    </Button>
                 )}
 
                 {isRecording && (
-                    <Button onClick={stopRecording} variant="destructive" className="w-full" size="lg">
+                    <Button onClick={stopRecording} variant="destructive" size="lg" className="w-full">
                         Stop Recording
                     </Button>
                 )}
@@ -258,43 +274,64 @@ export default function QuestionRecorder({
                     </Button>
                 )}
 
-                {/* Recorded Takes */}
-                {hasRecordings && viewingRecording === null && (
-                    <div className="space-y-3">
-                        <p className="font-medium">Your Recordings:</p>
-                        {recordings.map((_, index) => (
-                            <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-                                <input
-                                    type="radio"
-                                    name="selected-recording"
-                                    checked={selectedRecording === index}
-                                    onChange={() => setSelectedRecording(index)}
-                                    className="w-4 h-4"
-                                />
-                                <span className="flex-1 font-medium">Take {index + 1}</span>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => playRecording(index)}
-                                >
-                                    Play
-                                </Button>
+                {/* Recordings List */}
+                {hasRecordings && (
+                    <div className="space-y-2">
+                        <h3 className="font-semibold">Your Recordings</h3>
+                        {recordings.map((recording, idx) => (
+                            <div
+                                key={idx}
+                                className={`flex items-center justify-between p-3 rounded-lg border-2 ${selectedIndex === idx
+                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                                    : 'border-border'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    {selectedIndex === idx && (
+                                        <Check className="w-5 h-5 text-green-600" />
+                                    )}
+                                    <Video className="w-4 h-4" />
+                                    <span className="text-sm font-medium">Attempt {idx + 1}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={() => playRecording(idx)}
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        <Eye className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        onClick={() => handleSelectRecording(idx)}
+                                        variant={selectedIndex === idx ? 'default' : 'outline'}
+                                        size="sm"
+                                    >
+                                        {selectedIndex === idx ? 'Selected' : 'Select'}
+                                    </Button>
+                                    <Button
+                                        onClick={() => handleDeleteRecording(idx)}
+                                        variant="ghost"
+                                        size="sm"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
                             </div>
                         ))}
                     </div>
                 )}
 
                 {/* Next Button */}
-                {/* Next/Submit Button */}
-                {hasRecordings && !isRecording && countdown === null && (
-                    <Button
-                        onClick={handleNext}
-                        disabled={selectedRecording === null}
-                        className="w-full"
-                        size="lg"
-                    >
-                        {questionNumber === totalQuestions ? 'Submit Interview' : 'Continue to Next Question'}
+                {hasRecordings && selectedIndex !== null && (
+                    <Button onClick={handleNext} className="w-full" size="lg">
+                        Continue to Next Question
                     </Button>
+                )}
+
+                {!canRecord && selectedIndex === null && (
+                    <p className="text-center text-sm text-muted-foreground p-4 bg-muted rounded-lg">
+                        You&apos;ve used all {MAX_ATTEMPTS} attempts. Please select one recording to continue.
+                    </p>
                 )}
             </CardContent>
         </Card>

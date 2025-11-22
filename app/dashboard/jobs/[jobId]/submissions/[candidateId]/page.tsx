@@ -121,28 +121,36 @@ export default function CandidateDetailPage() {
         <div className="min-h-screen p-8">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold">{application.candidate.name}</h1>
-                        <p className="text-gray-600">{application.candidate.email}</p>
-                        <p className="text-sm text-gray-500 mt-2">
-                            {application.job.title} • {application.completedAt ? 'Completed' : 'In Progress'}
-                        </p>
+                    <div className="flex items-center gap-12">
+                        <div className="flex items-center gap-12">
+                            <h1 className="text-xl font-bold"> <strong>Job Desc: </strong>{application.job.title}</h1>
+                            <p className="text-gray-600 flex items-center gap-2">
+                                <span className={`text-2xl ${application.completedAt ? 'text-green-500' : 'text-yellow-500'}`}>•</span> {application.completedAt ? 'Completed' : 'In Progress'}
+                            </p>
+                        </div>
+                        <div className="h-6 w-0.5 bg-gray-400"/>
+                        <div className="flex items-center gap-12">
+                            <h1 className="text-xl font-bold"><strong>Candidate Info: </strong> {application.candidate.name}</h1>
+                            <p className="text-gray-600">{application.candidate.email}</p>
+                        </div>
                     </div>
                     <Button variant="outline" onClick={() => router.push(`/dashboard/jobs/${jobId}/submissions`)}>
                         Back to Submissions
                     </Button>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-x-2 space-y-2 grid grid-cols-3 mb-6">
                     {application.job.questions.map((question, index) => {
                         const video = videosByQuestion[question.id]
 
                         return (
-                            <Card key={question.id}>
+                            <Card key={question.id} className='col-span-1'>
                                 <CardHeader>
-                                    <CardTitle>Question {index + 1}</CardTitle>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle>Question {index + 1}</CardTitle>
+                                        <p className="text-sm text-gray-500">Time Limit: {question.timeLimit}s</p>
+                                    </div>
                                     <CardDescription>{question.questionText}</CardDescription>
-                                    <p className="text-sm text-gray-500">Time Limit: {question.timeLimit}s</p>
                                 </CardHeader>
                                 <CardContent>
                                     {video ? (
